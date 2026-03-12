@@ -218,14 +218,17 @@ Summary cuối tháng: tổng giờ, trung bình/ngày, work days, logged, missi
 # Team theo tháng — chi tiết từng ngày
 opcli stats --team
 
-# Team theo tuần — bảng tổng hợp
+# Team tổng hợp theo tuần
 opcli stats --team -w
+
+# Team chi tiết ngày trong tuần cụ thể
+opcli stats --team -w 10
 
 # Team tháng khác
 opcli stats --team -m 2 -y 2026
 ```
 
-Bảng tuần hiện tổng giờ mỗi member theo từng tuần, có màu theo mức giờ.
+`-w` không có số: bảng tổng hợp theo tuần. `-w <n>`: chi tiết từng ngày trong tuần đó.
 
 ### Alert
 
@@ -255,6 +258,28 @@ Kết quả theo số giờ đã log:
 - **0h** → 🔔 Don't forget!
 
 Notification gửi qua `terminal-notifier` (cần `brew install terminal-notifier`) + luôn in ra terminal.
+
+### Focus
+
+Theo dõi hoạt động và nhắc nhở khi idle quá lâu (chuột/bàn phím không hoạt động).
+
+```bash
+# Bật focus monitor (mặc định 10 phút)
+opcli focus on
+
+# Bật với threshold 15 phút
+opcli focus on -i 15
+
+# Tắt focus monitor
+opcli focus off
+
+# Xem trạng thái
+opcli focus status
+```
+
+Khi idle vượt threshold, sẽ gửi notification nhắc quay lại làm việc. Tự động reset khi phát hiện hoạt động trở lại.
+
+Yêu cầu macOS (sử dụng `ioreg` để detect idle time).
 
 ## Các status có sẵn
 

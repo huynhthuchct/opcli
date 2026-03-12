@@ -50,7 +50,8 @@
       "Bash(node --input-type=module -e \"\nimport { readFileSync } from 'fs';\nimport { join } from 'path';\nimport { homedir } from 'os';\nconst config = JSON.parse\\(readFileSync\\(join\\(homedir\\(\\), '.opcli', 'config.json'\\), 'utf-8'\\)\\);\nconst cookie = '_open_project_session=' + config.session;\n\nconst filters = JSON.stringify\\([\n  {spentOn: {operator: '<>d', values: ['2026-03-01','2026-03-31']}}\n]\\);\nconst params = new URLSearchParams\\({ filters, pageSize: '200', sortBy: JSON.stringify\\([['spentOn','asc']]\\) }\\);\nconst res = await fetch\\(config.url + '/api/v3/time_entries?' + params, {\n  headers: { Cookie: cookie, 'X-Requested-With': 'XMLHttpRequest' }\n}\\);\nconst data = await res.json\\(\\);\nconst users = new Set\\(\\);\n\\(data._embedded?.elements || []\\).forEach\\(el => users.add\\(el._links?.user?.title\\)\\);\nconsole.log\\('Users:', [...users]\\);\nconsole.log\\('Sample hours formats:'\\);\n\\(data._embedded?.elements || []\\).slice\\(0,5\\).forEach\\(el => console.log\\(el.hours, el._links?.user?.title, el.spentOn\\)\\);\n\" 2>&1)",
       "Bash(node dist/index.js stats --team -w 2>&1)",
       "Bash(node dist/index.js stats --team 2>&1)",
-      "Bash(node dist/index.js stats --team -w 10 2>&1)"
+      "Bash(node dist/index.js stats --team -w 10 2>&1)",
+      "Bash(ioreg -c IOHIDSystem)"
     ]
   }
 }
