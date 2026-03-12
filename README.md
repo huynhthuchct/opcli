@@ -132,6 +132,89 @@ opcli hook uninstall
 
 Sau khi cài, mỗi lần `git commit` sẽ hỏi nhập hours (enter để skip).
 
+### Notifications
+
+```bash
+# Danh sách unread (mặc định 20)
+opcli notifications list
+
+# Giới hạn số lượng
+opcli notifications list -n 10
+
+# Tất cả (cả đã đọc)
+opcli notifications list -a
+
+# Đánh dấu đã đọc
+opcli notifications read <id>
+
+# Đánh dấu tất cả đã đọc
+opcli notifications read --all
+```
+
+### Reminder
+
+Hiện tổng quan task theo mức độ ưu tiên deadline.
+
+```bash
+# Mặc định hiện tasks due trong 3 ngày
+opcli reminder
+
+# Tasks due trong 7 ngày
+opcli reminder -d 7
+```
+
+Thứ tự hiển thị:
+1. 🔴 **Due today** — deadline hôm nay
+2. 🟡 **Due soon** — sắp đến deadline
+3. 🔵 **New** — task mới
+4. 🔴 **Overdue** — quá hạn
+5. ⚪ **Other** — còn lại
+
+### Stats
+
+Thống kê số giờ log time theo ngày trong tháng.
+
+```bash
+# Tháng hiện tại
+opcli stats
+
+# Chỉ định tháng/năm
+opcli stats -m 2
+opcli stats -m 1 -y 2025
+```
+
+Mỗi ngày hiện tổng giờ với màu: 🔴 <=4h, 🟡 <7h, 🟢 >=7h, kèm chi tiết task ID + hours.
+Summary cuối tháng: tổng giờ, trung bình/ngày, work days, logged, missing.
+
+### Alert
+
+Nhắc nhở log time hàng ngày. Sau giờ chỉ định (mặc định 17:00), cron sẽ kiểm tra và gửi notification.
+
+```bash
+# Bật alert (cron chạy 17:00 weekdays)
+opcli alert on
+
+# Bật alert lúc 18:00
+opcli alert on -h 18
+
+# Tắt alert
+opcli alert off
+
+# Xem trạng thái
+opcli alert status
+
+# Kiểm tra thủ công
+opcli alert check
+```
+
+Kết quả theo số giờ đã log:
+- **>=8h** → 🎉 Great job!
+- **>4h <8h** → 💪 Fighting!
+- **<4h** → ⚠️ Consider logging more
+- **0h** → 🔔 Don't forget!
+
+Notification gửi qua `terminal-notifier` (cần `brew install terminal-notifier`) + luôn in ra terminal.
+
 ## Các status có sẵn
 
 New, In specification, Specified, Confirmed, To be scheduled, Scheduled, In progress, Developed, In testing, Tested, Test failed, Closed, On hold, Rejected, Staging, Production, Fixed

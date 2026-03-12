@@ -16,6 +16,8 @@ export interface WorkPackage {
   assignee: string;
   createdAt: string;
   updatedAt: string;
+  startDate: string;
+  dueDate: string;
 }
 
 export interface WorkPackageDetail extends WorkPackage {
@@ -47,6 +49,26 @@ export interface Relation {
   fromTitle: string;
   toId: number;
   toTitle: string;
+}
+
+export interface TimeEntry {
+  id: number;
+  spentOn: string;
+  hours: number;
+  workPackageId: number;
+  workPackageTitle: string;
+  comment: string;
+}
+
+export interface Notification {
+  id: number;
+  reason: string;
+  read: boolean;
+  createdAt: string;
+  actor: string;
+  resourceId: number;
+  resourceTitle: string;
+  project: string;
 }
 
 export interface Status {
@@ -190,6 +212,8 @@ export class OpenProjectClient {
       assignee: el._links?.assignee?.title || "Unassigned",
       createdAt: el.createdAt || "",
       updatedAt: el.updatedAt || "",
+      startDate: el.startDate || "",
+      dueDate: el.dueDate || "",
     }));
   }
 
@@ -303,6 +327,71 @@ export class OpenProjectClient {
     await this.request("/api/v3/time_entries", {
       method: "POST",
       body: JSON.stringify(body),
+    });
+  }
+
+  async getNotifications(options?: { unreadOnly?: boolean; pageSize?: number }): Promise<Notification[]> {
+    const filters: any[] = [];
+    if (options?.unreadOnly !== false) {
+      filters.push({ readIAN: { operator: "=", values: ["f"] } });
+    }
+    const params = new URLSearchParams({
+      filters: JSON.stringify(filters),
+      pageSize: String(options?.pageSize || 20),
+      sortBy: JSON.stringify([["createdAt", "desc"]]),
+    });
+    const data = await this.request(`/api/v3/notifications?${params}`);
+    return (data._embedded?.elements || []).map((el: any) => {
+      const resourceHref = el._links?.resource?.href || "";
+      const resourceIdMatch = resourceHref.match(/\/(\d+)$/);
+      return {
+        id: el.id,
+        reason: el.reason || "",
+        read: el.readIAN || false,
+        createdAt: el.createdAt || "",
+        actor: el._links?.actor?.title || "",
+        resourceId: resourceIdMatch ? Number(resourceIdMatch[1]) : 0,
+        resourceTitle: el._links?.resource?.title || "",
+        project: el._links?.project?.title || "",
+      };
+    });
+  }
+
+  async markNotificationRead(id: number): Promise<void> {
+    await this.request(`/api/v3/notifications/${id}/read_ian`, {
+      method: "POST",
+    });
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    await this.request("/api/v3/notifications/read_ian", {
+      method: "POST",
+    });
+  }
+
+  async getTimeEntries(from: string, to: string): Promise<TimeEntry[]> {
+    const filters = JSON.stringify([
+      { user: { operator: "=", values: ["me"] } },
+      { spentOn: { operator: "<>d", values: [from, to] } },
+    ]);
+    const params = new URLSearchParams({
+      filters,
+      pageSize: "500",
+      sortBy: JSON.stringify([["spentOn", "asc"]]),
+    });
+    const data = await this.request(`/api/v3/time_entries?${params}`);
+    return (data._embedded?.elements || []).map((el: any) => {
+      const wpHref = el._links?.workPackage?.href || "";
+      const wpIdMatch = wpHref.match(/\/(\d+)$/);
+      const hoursMatch = (el.hours || "").match(/PT(\d+(?:\.\d+)?)H/);
+      return {
+        id: el.id,
+        spentOn: el.spentOn || "",
+        hours: hoursMatch ? parseFloat(hoursMatch[1]) : 0,
+        workPackageId: wpIdMatch ? Number(wpIdMatch[1]) : 0,
+        workPackageTitle: el._links?.workPackage?.title || "",
+        comment: el.comment?.raw || "",
+      };
     });
   }
 }
