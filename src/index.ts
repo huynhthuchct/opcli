@@ -1,6 +1,8 @@
 import { Command } from "commander";
 import { configCommand } from "./commands/config.js";
 import { tasksCommand } from "./commands/tasks.js";
+import { logCommand } from "./commands/log.js";
+import { hookCommand } from "./commands/hook.js";
 
 const program = new Command();
 
@@ -11,5 +13,7 @@ program
 
 program.addCommand(configCommand);
 program.addCommand(tasksCommand);
+program.addCommand(logCommand);
+program.addCommand(hookCommand);
 
 program.parse();

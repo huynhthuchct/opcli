@@ -59,6 +59,9 @@ opcli tasks view <id> --activities --relations
 ### Cập nhật task
 
 ```bash
+# Interactive mode (chọn field để update)
+opcli tasks update <id>
+
 # Cập nhật status
 opcli tasks update <id> -s "In progress"
 
@@ -94,6 +97,40 @@ opcli tasks create-branch <id> <slug> -p fix
 opcli tasks create-branch 54379 fix-ad-clicks -p fix
 # → fix/op-54379-fix-ad-clicks
 ```
+
+### Auto log time từ git branch
+
+Tự động detect task ID từ branch name format `<prefix>/op-<id>-<slug>`.
+
+```bash
+# Interactive: hiện commits chưa log, chọn auto/manual hours
+opcli log
+
+# Log trực tiếp với số giờ
+opcli log --hours 2
+```
+
+Flow:
+1. Detect branch → extract task ID
+2. Hiện danh sách commits chưa log
+3. Chọn mode: Auto (tính từ timestamps) hoặc Manual (nhập giờ)
+4. Confirm → log time → đánh dấu commits đã log
+
+Trạng thái commits đã log được lưu tại `~/.opcli/logs/`.
+
+### Git hook
+
+Cài post-commit hook để prompt log time sau mỗi lần commit.
+
+```bash
+# Cài hook
+opcli hook install
+
+# Gỡ hook
+opcli hook uninstall
+```
+
+Sau khi cài, mỗi lần `git commit` sẽ hỏi nhập hours (enter để skip).
 
 ## Các status có sẵn
 

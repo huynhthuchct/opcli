@@ -4,6 +4,7 @@ import chalk from "chalk";
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import { loadConfig } from "../config/store.js";
 import { OpenProjectClient } from "../api/openproject.js";
+import { select, input, checkbox } from "@inquirer/prompts";
 import type { WorkPackage } from "../api/openproject.js";
 
 function requireConfig() {
@@ -147,15 +148,16 @@ export function formatTasksTable(tasks: WorkPackage[]): string {
   const idW = Math.max(2, ...tasks.map((t) => String(t.id).length));
   const stW = Math.max(6, ...tasks.map((t) => t.status.length));
   const prW = Math.max(8, ...tasks.map((t) => t.priority.length));
+  const asW = Math.max(8, ...tasks.map((t) => t.assignee.length));
   const dtW = 10;
 
   const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - s.length));
-  const header = chalk.bold(`${pad("ID", idW)} | ${pad("Status", stW)} | ${pad("Priority", prW)} | ${pad("Created", dtW)} | ${pad("Updated", dtW)} | Subject`);
-  const separator = chalk.gray("-".repeat(idW + stW + prW + dtW * 2 + 50));
+  const header = chalk.bold(`${pad("ID", idW)} | ${pad("Status", stW)} | ${pad("Priority", prW)} | ${pad("Assignee", asW)} | ${pad("Created", dtW)} | ${pad("Updated", dtW)} | Subject`);
+  const separator = chalk.gray("-".repeat(idW + stW + prW + asW + dtW * 2 + 60));
   const rows = tasks.map(
     (t) => {
       const statusPadded = t.status + " ".repeat(Math.max(0, stW - t.status.length));
-      return `${pad(String(t.id), idW)} | ${colorStatus(statusPadded)} | ${pad(t.priority, prW)} | ${pad(formatDate(t.createdAt), dtW)} | ${pad(formatDate(t.updatedAt), dtW)} | ${t.subject}`;
+      return `${pad(String(t.id), idW)} | ${colorStatus(statusPadded)} | ${pad(t.priority, prW)} | ${pad(t.assignee, asW)} | ${pad(formatDate(t.createdAt), dtW)} | ${pad(formatDate(t.updatedAt), dtW)} | ${t.subject}`;
     }
   );
   return [header, separator, ...rows].join("\n");
@@ -400,7 +402,94 @@ tasksCommand
       }
 
       if (changes.length === 0 && !options.logTime) {
-        console.log(chalk.gray("No changes specified. Use --help to see options."));
+        // Interactive mode
+        const selected = await checkbox({
+          message: "Select fields to update:",
+          choices: [
+            { name: `Status (${task.status})`, value: "status" },
+            { name: `Assignee (${task.assignee})`, value: "assignee" },
+            { name: `Start date (${task.startDate || "none"})`, value: "start" },
+            { name: `Due date (${task.dueDate || "none"})`, value: "due" },
+            { name: "Description", value: "description" },
+            { name: "Log time", value: "logTime" },
+          ],
+        });
+
+        if (selected.length === 0) {
+          console.log(chalk.gray("No fields selected."));
+          return;
+        }
+
+        if (selected.includes("status")) {
+          const statuses = await client.getAvailableStatuses(task.id);
+          const chosen = await select({
+            message: "Select new status:",
+            choices: statuses.map((s) => ({ name: s.name, value: s })),
+          });
+          fields.status = chosen.href;
+          changes.push(`Status → ${chosen.name}`);
+        }
+
+        if (selected.includes("assignee")) {
+          const assigneeInput = await input({ message: "Assignee (name, user ID, or 'me'):" });
+          let assigneeHref: string;
+          if (assigneeInput === "me") {
+            assigneeHref = "/api/v3/users/me";
+          } else if (!isNaN(Number(assigneeInput))) {
+            assigneeHref = `/api/v3/users/${assigneeInput}`;
+          } else {
+            const users = await client.searchUsers(assigneeInput);
+            if (users.length === 0) {
+              console.error(`No user found matching "${assigneeInput}".`);
+              process.exit(1);
+            }
+            if (users.length === 1) {
+              assigneeHref = `/api/v3/users/${users[0].id}`;
+              console.log(`Found: ${users[0].firstName} (${users[0].login})`);
+            } else {
+              const chosen = await select({
+                message: "Select user:",
+                choices: users.map((u) => ({ name: `${u.firstName} (${u.login})`, value: u })),
+              });
+              assigneeHref = `/api/v3/users/${chosen.id}`;
+            }
+          }
+          fields.assignee = assigneeHref;
+          changes.push(`Assignee → ${assigneeInput}`);
+        }
+
+        if (selected.includes("start")) {
+          const val = await input({ message: "Start date (YYYY-MM-DD):", default: task.startDate || undefined });
+          fields.startDate = val;
+          changes.push(`Start → ${val}`);
+        }
+
+        if (selected.includes("due")) {
+          const val = await input({ message: "Due date (YYYY-MM-DD):", default: task.dueDate || undefined });
+          fields.dueDate = val;
+          changes.push(`Due → ${val}`);
+        }
+
+        if (selected.includes("description")) {
+          const val = await input({ message: "Description:" });
+          fields.description = val;
+          changes.push("Description updated");
+        }
+
+        if (changes.length > 0) {
+          console.log("\nChanges:");
+          changes.forEach((c) => console.log(`  ${chalk.yellow("→")} ${c}`));
+          await client.updateWorkPackage(task.id, task.lockVersion, fields);
+          console.log(chalk.green("\nWork package updated."));
+        }
+
+        if (selected.includes("logTime")) {
+          const hours = await input({ message: "Hours (1-9):" });
+          const spentOn = await input({ message: "Date (YYYY-MM-DD):", default: new Date().toISOString().substring(0, 10) });
+          const comment = await input({ message: "Comment (optional):" });
+          await client.logTime(task.id, parseFloat(hours), spentOn, comment || undefined);
+          console.log(chalk.green(`Logged ${hours}h on ${spentOn}.`));
+        }
       }
     } catch (err: any) {
       console.error(`Error: ${err.message}`);

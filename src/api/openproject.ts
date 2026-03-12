@@ -13,6 +13,7 @@ export interface WorkPackage {
   lockVersion: number;
   status: string;
   priority: string;
+  assignee: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -186,6 +187,7 @@ export class OpenProjectClient {
       lockVersion: el.lockVersion,
       status: el._links?.status?.title || "Unknown",
       priority: el._links?.priority?.title || "Unknown",
+      assignee: el._links?.assignee?.title || "Unassigned",
       createdAt: el.createdAt || "",
       updatedAt: el.updatedAt || "",
     }));
