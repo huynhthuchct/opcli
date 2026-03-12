@@ -5,6 +5,14 @@ CLI tool để tương tác với OpenProject, hỗ trợ quản lý task, cập
 ## Cài đặt
 
 ```bash
+npm i -g @huynhthuc/opcli
+```
+
+Hoặc từ source:
+
+```bash
+git clone https://github.com/huynhthuchct/opcli.git
+cd opcli
 npm install
 npm run build
 npm link

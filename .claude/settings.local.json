@@ -44,7 +44,9 @@
       "Bash(node dist/index.js alert status 2>&1)",
       "Bash(osascript -e 'display notification \"Test alert from opcli\" with title \"opcli\"' 2>&1)",
       "Bash(terminal-notifier -title \"opcli — Test\" -message \"This is a test notification\" -sound default -group opcli 2>&1)",
-      "Bash(terminal-notifier -title \"opcli\" -message \"Test\" -sound default 2>&1; echo \"exit: $?\")"
+      "Bash(terminal-notifier -title \"opcli\" -message \"Test\" -sound default 2>&1; echo \"exit: $?\")",
+      "Bash(NPM_TOKEN=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 npm publish --access public --registry https://registry.npmjs.org/ 2>&1)",
+      "Bash(echo \"//registry.npmjs.org/:_authToken=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\" > /Users/thuchuynh/Documents/projects/mylab-main/opcli/.npmrc && npm publish --access public 2>&1)"
     ]
   }
 }
