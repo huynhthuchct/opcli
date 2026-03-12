@@ -49,6 +49,24 @@ opcli tasks list -a "username"
 opcli tasks list -a all
 ```
 
+### Interactive search
+
+```bash
+# Search tasks của mình (live filter)
+opcli tasks search
+
+# Search tất cả tasks
+opcli tasks search -a all
+```
+
+Gõ keyword → live filter theo subject, ID, status, priority, assignee → chọn task → action: View detail / Update / Comment / Create branch.
+
+### Comment
+
+```bash
+opcli tasks comment <id> "Nội dung comment"
+```
+
 ### Xem chi tiết task
 
 ```bash
@@ -183,7 +201,7 @@ Thứ tự hiển thị:
 Thống kê số giờ log time theo ngày trong tháng.
 
 ```bash
-# Tháng hiện tại
+# Cá nhân — tháng hiện tại
 opcli stats
 
 # Chỉ định tháng/năm
@@ -193,6 +211,21 @@ opcli stats -m 1 -y 2025
 
 Mỗi ngày hiện tổng giờ với màu: 🔴 <=4h, 🟡 <7h, 🟢 >=7h, kèm chi tiết task ID + hours.
 Summary cuối tháng: tổng giờ, trung bình/ngày, work days, logged, missing.
+
+#### Team Stats
+
+```bash
+# Team theo tháng — chi tiết từng ngày
+opcli stats --team
+
+# Team theo tuần — bảng tổng hợp
+opcli stats --team -w
+
+# Team tháng khác
+opcli stats --team -m 2 -y 2026
+```
+
+Bảng tuần hiện tổng giờ mỗi member theo từng tuần, có màu theo mức giờ.
 
 ### Alert
 

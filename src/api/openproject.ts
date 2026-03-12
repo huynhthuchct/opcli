@@ -58,6 +58,7 @@ export interface TimeEntry {
   workPackageId: number;
   workPackageTitle: string;
   comment: string;
+  user: string;
 }
 
 export interface Notification {
@@ -369,13 +370,24 @@ export class OpenProjectClient {
     });
   }
 
-  async getTimeEntries(from: string, to: string): Promise<TimeEntry[]> {
-    const filters = JSON.stringify([
-      { user: { operator: "=", values: ["me"] } },
+  private parseHours(iso: string): number {
+    let hours = 0;
+    const hMatch = iso.match(/(\d+(?:\.\d+)?)H/);
+    const mMatch = iso.match(/(\d+(?:\.\d+)?)M/);
+    if (hMatch) hours += parseFloat(hMatch[1]);
+    if (mMatch) hours += parseFloat(mMatch[1]) / 60;
+    return Math.round(hours * 100) / 100;
+  }
+
+  async getTimeEntries(from: string, to: string, options?: { team?: boolean }): Promise<TimeEntry[]> {
+    const filters: any[] = [
       { spentOn: { operator: "<>d", values: [from, to] } },
-    ]);
+    ];
+    if (!options?.team) {
+      filters.push({ user: { operator: "=", values: ["me"] } });
+    }
     const params = new URLSearchParams({
-      filters,
+      filters: JSON.stringify(filters),
       pageSize: "500",
       sortBy: JSON.stringify([["spentOn", "asc"]]),
     });
@@ -383,15 +395,22 @@ export class OpenProjectClient {
     return (data._embedded?.elements || []).map((el: any) => {
       const wpHref = el._links?.workPackage?.href || "";
       const wpIdMatch = wpHref.match(/\/(\d+)$/);
-      const hoursMatch = (el.hours || "").match(/PT(\d+(?:\.\d+)?)H/);
       return {
         id: el.id,
         spentOn: el.spentOn || "",
-        hours: hoursMatch ? parseFloat(hoursMatch[1]) : 0,
+        hours: this.parseHours(el.hours || ""),
         workPackageId: wpIdMatch ? Number(wpIdMatch[1]) : 0,
         workPackageTitle: el._links?.workPackage?.title || "",
         comment: el.comment?.raw || "",
+        user: el._links?.user?.title || "",
       };
+    });
+  }
+
+  async addComment(workPackageId: number, message: string): Promise<void> {
+    await this.request(`/api/v3/work_packages/${workPackageId}/activities`, {
+      method: "POST",
+      body: JSON.stringify({ comment: { raw: message } }),
     });
   }
 }

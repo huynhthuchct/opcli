@@ -35,11 +35,20 @@ function getDayName(dateStr: string): string {
 
 export const statsCommand = new Command("stats");
 
+function getWeekNumber(dateStr: string): number {
+  const d = new Date(dateStr);
+  const start = new Date(d.getFullYear(), 0, 1);
+  const diff = d.getTime() - start.getTime();
+  return Math.ceil((diff / (1000 * 60 * 60 * 24) + start.getDay() + 1) / 7);
+}
+
 statsCommand
   .description("Show time logging statistics")
   .option("-m, --month <month>", "Month (1-12, default: current)")
   .option("-y, --year <year>", "Year (default: current)")
-  .action(async (options: { month?: string; year?: string }) => {
+  .option("-t, --team", "Show team stats")
+  .option("-w, --week [weekNumber]", "Week mode: no value = summary by week, with number = detail for that week")
+  .action(async (options: { month?: string; year?: string; team?: boolean; week?: string | boolean }) => {
     const config = requireConfig();
     const client = new OpenProjectClient(config);
 
@@ -51,73 +60,222 @@ statsCommand
       const from = `${year}-${String(month).padStart(2, "0")}-01`;
       const to = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
 
-      const entries = await client.getTimeEntries(from, to);
-
-      const monthName = new Date(year, month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-      console.log(chalk.bold(`\nTime Stats — ${monthName}\n`));
-
-      // Group by date
-      const byDate = new Map<string, TimeEntry[]>();
-      for (const e of entries) {
-        const list = byDate.get(e.spentOn) || [];
-        list.push(e);
-        byDate.set(e.spentOn, list);
+      if (options.team) {
+        const weekNum = typeof options.week === "string" ? parseInt(options.week, 10) : undefined;
+        const weekSummary = options.week === true;
+        await showTeamStats(client, from, to, year, month, daysInMonth, weekSummary, weekNum);
+      } else {
+        await showMyStats(client, from, to, year, month, daysInMonth, now);
       }
-
-      const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - s.length));
-      let totalHours = 0;
-      let workDays = 0;
-      let loggedDays = 0;
-
-      for (let d = 1; d <= daysInMonth; d++) {
-        const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-        const dayName = getDayName(dateStr);
-        const weekend = isWeekend(dateStr);
-
-        if (!weekend) workDays++;
-
-        const dayEntries = byDate.get(dateStr) || [];
-        const dayTotal = dayEntries.reduce((sum, e) => sum + e.hours, 0);
-
-        if (dayTotal > 0) {
-          loggedDays++;
-          totalHours += dayTotal;
-        }
-
-        // Date label
-        const dateLabel = weekend ? chalk.gray(`${dateStr} ${dayName}`) : `${dateStr} ${chalk.gray(dayName)}`;
-
-        if (dayTotal === 0) {
-          if (weekend) {
-            console.log(`  ${dateLabel}  ${chalk.gray("—")}`);
-          } else {
-            // Only show as missing if date is in the past
-            const today = now.toISOString().substring(0, 10);
-            if (dateStr <= today) {
-              console.log(`  ${dateLabel}  ${chalk.red("0.0h")}`);
-            } else {
-              console.log(`  ${dateLabel}  ${chalk.gray("—")}`);
-            }
-          }
-        } else {
-          console.log(`  ${dateLabel}  ${colorHours(dayTotal)}`);
-          dayEntries.forEach((e) => {
-            const taskLabel = chalk.gray(`#${e.workPackageId}`);
-            const title = e.workPackageTitle.length > 50
-              ? e.workPackageTitle.substring(0, 49) + "…"
-              : e.workPackageTitle;
-            console.log(`    ${taskLabel} ${pad(e.hours.toFixed(1) + "h", 6)} ${title}`);
-          });
-        }
-      }
-
-      // Summary
-      const avgHours = loggedDays > 0 ? totalHours / loggedDays : 0;
-      console.log(chalk.bold(`\n  Total:   ${colorHours(totalHours)} in ${loggedDays} days`));
-      console.log(chalk.bold(`  Average: ${colorHours(avgHours)} / day`));
-      console.log(chalk.gray(`  Work days: ${workDays} | Logged: ${loggedDays} | Missing: ${workDays - loggedDays}\n`));
     } catch (err: any) {
       console.error(`Error: ${err.message}`);
       process.exit(1);
     }
   });
+
+async function showMyStats(
+  client: OpenProjectClient, from: string, to: string,
+  year: number, month: number, daysInMonth: number, now: Date
+) {
+  const entries = await client.getTimeEntries(from, to);
+  const monthName = new Date(year, month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  console.log(chalk.bold(`\nTime Stats — ${monthName}\n`));
+
+  const byDate = new Map<string, TimeEntry[]>();
+  for (const e of entries) {
+    const list = byDate.get(e.spentOn) || [];
+    list.push(e);
+    byDate.set(e.spentOn, list);
+  }
+
+  const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - s.length));
+  let totalHours = 0;
+  let workDays = 0;
+  let loggedDays = 0;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const dayName = getDayName(dateStr);
+    const weekend = isWeekend(dateStr);
+
+    if (!weekend) workDays++;
+
+    const dayEntries = byDate.get(dateStr) || [];
+    const dayTotal = dayEntries.reduce((sum, e) => sum + e.hours, 0);
+
+    if (dayTotal > 0) {
+      loggedDays++;
+      totalHours += dayTotal;
+    }
+
+    const dateLabel = weekend ? chalk.gray(`${dateStr} ${dayName}`) : `${dateStr} ${chalk.gray(dayName)}`;
+
+    if (dayTotal === 0) {
+      if (weekend) {
+        console.log(`  ${dateLabel}  ${chalk.gray("—")}`);
+      } else {
+        const today = now.toISOString().substring(0, 10);
+        if (dateStr <= today) {
+          console.log(`  ${dateLabel}  ${chalk.red("0.0h")}`);
+        } else {
+          console.log(`  ${dateLabel}  ${chalk.gray("—")}`);
+        }
+      }
+    } else {
+      console.log(`  ${dateLabel}  ${colorHours(dayTotal)}`);
+      dayEntries.forEach((e) => {
+        const taskLabel = chalk.gray(`#${e.workPackageId}`);
+        const title = e.workPackageTitle.length > 50
+          ? e.workPackageTitle.substring(0, 49) + "…"
+          : e.workPackageTitle;
+        console.log(`    ${taskLabel} ${pad(e.hours.toFixed(1) + "h", 6)} ${title}`);
+      });
+    }
+  }
+
+  const avgHours = loggedDays > 0 ? totalHours / loggedDays : 0;
+  console.log(chalk.bold(`\n  Total:   ${colorHours(totalHours)} in ${loggedDays} days`));
+  console.log(chalk.bold(`  Average: ${colorHours(avgHours)} / day`));
+  console.log(chalk.gray(`  Work days: ${workDays} | Logged: ${loggedDays} | Missing: ${workDays - loggedDays}\n`));
+}
+
+async function showTeamStats(
+  client: OpenProjectClient, from: string, to: string,
+  year: number, month: number, daysInMonth: number, weekSummary?: boolean, weekNumber?: number
+) {
+  const entries = await client.getTimeEntries(from, to, { team: true });
+  const monthName = new Date(year, month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  if (weekNumber) {
+    // Detail mode for specific week
+    const weekEntries = entries.filter((e) => getWeekNumber(e.spentOn) === weekNumber);
+    console.log(chalk.bold(`\nTeam Stats — ${monthName} — Week ${weekNumber}\n`));
+
+    const users = [...new Set(weekEntries.map((e) => e.user))].sort();
+    const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - s.length));
+
+    // Collect dates in this week
+    const dates = [...new Set(weekEntries.map((e) => e.spentOn))].sort();
+    const nameW = Math.max(10, ...users.map((u) => u.split("@")[0].length));
+    const colW = 6;
+
+    const padColor = (raw: string, colored: string, w: number) =>
+      colored + " ".repeat(Math.max(0, w - raw.length));
+
+    // Header
+    const header = pad("Member", nameW) + " | " + dates.map((d) => pad(d.substring(5) + " " + getDayName(d), colW)).join(" | ") + " | Total";
+    console.log(chalk.bold(`  ${header}`));
+    console.log(chalk.gray("  " + "-".repeat(header.length)));
+
+    // Group by user + date
+    const byUserDate = new Map<string, Map<string, number>>();
+    for (const e of weekEntries) {
+      if (!byUserDate.has(e.user)) byUserDate.set(e.user, new Map());
+      const m = byUserDate.get(e.user)!;
+      m.set(e.spentOn, (m.get(e.spentOn) || 0) + e.hours);
+    }
+
+    for (const user of users) {
+      const name = user.split("@")[0];
+      const userMap = byUserDate.get(user) || new Map();
+      let total = 0;
+      const cols = dates.map((d) => {
+        const h = userMap.get(d) || 0;
+        total += h;
+        if (h > 0) {
+          return padColor(h.toFixed(1) + "h", colorHours(h), colW);
+        }
+        return padColor("—", chalk.gray("—"), colW);
+      });
+      console.log(`  ${pad(name, nameW)} | ${cols.join(" | ")} | ${colorHours(total)}`);
+    }
+
+    const totalAll = weekEntries.reduce((sum, e) => sum + e.hours, 0);
+    console.log(chalk.bold(`\n  Team Total: ${colorHours(totalAll)} | Members: ${users.length}\n`));
+    return;
+  }
+
+  console.log(chalk.bold(`\nTeam Stats — ${monthName}\n`));
+
+  // Collect users
+  const users = [...new Set(entries.map((e) => e.user))].sort();
+  const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - s.length));
+
+  if (weekSummary) {
+    // Group by user + week
+    const byUserWeek = new Map<string, Map<number, number>>();
+    const weeks = new Set<number>();
+    for (const e of entries) {
+      const week = getWeekNumber(e.spentOn);
+      weeks.add(week);
+      if (!byUserWeek.has(e.user)) byUserWeek.set(e.user, new Map());
+      const userMap = byUserWeek.get(e.user)!;
+      userMap.set(week, (userMap.get(week) || 0) + e.hours);
+    }
+
+    const sortedWeeks = [...weeks].sort((a, b) => a - b);
+    const nameW = Math.max(10, ...users.map((u) => u.split("@")[0].length));
+    const colW = 8;
+
+    // Header
+    const header = pad("Member", nameW) + " | " + sortedWeeks.map((w) => pad(`W${w}`, colW)).join(" | ") + " | Total";
+    console.log(chalk.bold(`  ${header}`));
+    console.log(chalk.gray("  " + "-".repeat(header.length)));
+
+    const padColor = (raw: string, colored: string, w: number) =>
+      colored + " ".repeat(Math.max(0, w - raw.length));
+
+    for (const user of users) {
+      const name = user.split("@")[0];
+      const userMap = byUserWeek.get(user) || new Map();
+      let total = 0;
+      const cols = sortedWeeks.map((w) => {
+        const h = userMap.get(w) || 0;
+        total += h;
+        if (h > 0) {
+          const raw = h.toFixed(1) + "h";
+          return padColor(raw, colorHours(h), colW);
+        }
+        return padColor("—", chalk.gray("—"), colW);
+      });
+      console.log(`  ${pad(name, nameW)} | ${cols.join(" | ")} | ${colorHours(total)}`);
+    }
+  } else {
+    // Group by user + date
+    const byUserDate = new Map<string, Map<string, number>>();
+    for (const e of entries) {
+      if (!byUserDate.has(e.user)) byUserDate.set(e.user, new Map());
+      const userMap = byUserDate.get(e.user)!;
+      userMap.set(e.spentOn, (userMap.get(e.spentOn) || 0) + e.hours);
+    }
+
+    const nameW = Math.max(10, ...users.map((u) => u.split("@")[0].length));
+
+    for (const user of users) {
+      const name = user.split("@")[0];
+      const userMap = byUserDate.get(user) || new Map();
+      let totalHours = 0;
+      let loggedDays = 0;
+
+      console.log(chalk.bold.cyan(`  ${name}`));
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+        const weekend = isWeekend(dateStr);
+        const h = userMap.get(dateStr) || 0;
+        if (h > 0) {
+          loggedDays++;
+          totalHours += h;
+        }
+        if (!weekend && h > 0) {
+          console.log(`    ${dateStr} ${colorHours(h)}`);
+        }
+      }
+      console.log(chalk.gray(`    Total: ${totalHours.toFixed(1)}h | Days: ${loggedDays}\n`));
+    }
+  }
+
+  // Team summary
+  const totalAll = entries.reduce((sum, e) => sum + e.hours, 0);
+  console.log(chalk.bold(`  Team Total: ${colorHours(totalAll)} | Members: ${users.length}\n`));
+}

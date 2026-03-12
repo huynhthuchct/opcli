@@ -4,7 +4,7 @@ import chalk from "chalk";
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import { loadConfig } from "../config/store.js";
 import { OpenProjectClient } from "../api/openproject.js";
-import { select, input, checkbox } from "@inquirer/prompts";
+import { select, input, checkbox, search } from "@inquirer/prompts";
 import type { WorkPackage } from "../api/openproject.js";
 
 function requireConfig() {
@@ -516,6 +516,104 @@ tasksCommand
 
       execSync(`git checkout -b ${branchName}`, { stdio: "inherit" });
       console.log(chalk.green(`\nBranch "${branchName}" created and checked out.`));
+    } catch (err: any) {
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+tasksCommand
+  .command("comment <id> <message>")
+  .description("Add a comment to a work package")
+  .action(async (id: string, message: string) => {
+    const config = requireConfig();
+    const client = new OpenProjectClient(config);
+
+    try {
+      const task = await client.getWorkPackage(Number(id));
+      console.log(chalk.bold(`#${task.id} ${task.subject}\n`));
+      await client.addComment(task.id, message);
+      console.log(chalk.green("Comment added."));
+    } catch (err: any) {
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+tasksCommand
+  .command("search")
+  .description("Interactive search for work packages")
+  .option("-a, --assignee <user>", "Filter by assignee (default: me)")
+  .action(async (options: { assignee?: string }) => {
+    const config = requireConfig();
+    const client = new OpenProjectClient(config);
+
+    try {
+      // Pre-load all tasks
+      const assignee = options.assignee || "me";
+      let allTasks = await client.listWorkPackages({ assignee: assignee === "all" ? "all" : assignee });
+
+      const chosen = await search<WorkPackage>({
+        message: "Search tasks (type to filter):",
+        source: async (term) => {
+          if (!term) {
+            return allTasks.slice(0, 20).map((t) => ({
+              name: `#${t.id} [${colorStatus(t.status)}] ${t.subject}`,
+              value: t,
+            }));
+          }
+          const lower = term.toLowerCase();
+          const filtered = allTasks.filter(
+            (t) =>
+              t.subject.toLowerCase().includes(lower) ||
+              String(t.id).includes(lower) ||
+              t.status.toLowerCase().includes(lower) ||
+              t.priority.toLowerCase().includes(lower) ||
+              t.assignee.toLowerCase().includes(lower)
+          );
+          return filtered.map((t) => ({
+            name: `#${t.id} [${colorStatus(t.status)}] ${t.subject}`,
+            value: t,
+          }));
+        },
+      });
+
+      // Show detail + actions
+      console.log();
+      console.log(chalk.bold(`#${chosen.id} ${chosen.subject}\n`));
+      console.log(`  ${chalk.gray("Status:")}   ${colorStatus(chosen.status)}`);
+      console.log(`  ${chalk.gray("Priority:")} ${chosen.priority}`);
+      console.log(`  ${chalk.gray("Assignee:")} ${chosen.assignee}`);
+      if (chosen.dueDate) console.log(`  ${chalk.gray("Due:")}      ${chosen.dueDate}`);
+      console.log();
+
+      const action = await select({
+        message: "Action:",
+        choices: [
+          { name: "View detail", value: "view" },
+          { name: "Update", value: "update" },
+          { name: "Comment", value: "comment" },
+          { name: "Create branch", value: "branch" },
+          { name: "Exit", value: "exit" },
+        ],
+      });
+
+      if (action === "view") {
+        execSync(`node ${process.argv[1]} tasks view ${chosen.id} --activities --relations`, { stdio: "inherit" });
+      } else if (action === "update") {
+        execSync(`node ${process.argv[1]} tasks update ${chosen.id}`, { stdio: "inherit" });
+      } else if (action === "comment") {
+        const msg = await input({ message: "Comment:" });
+        if (msg) {
+          await client.addComment(chosen.id, msg);
+          console.log(chalk.green("Comment added."));
+        }
+      } else if (action === "branch") {
+        const slug = await input({ message: "Branch slug:" });
+        if (slug) {
+          execSync(`node ${process.argv[1]} tasks create-branch ${chosen.id} ${slug}`, { stdio: "inherit" });
+        }
+      }
     } catch (err: any) {
       console.error(`Error: ${err.message}`);
       process.exit(1);
