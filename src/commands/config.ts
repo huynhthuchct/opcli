@@ -14,13 +14,14 @@ configCommand
 
     const { username, password } = await promptCredentials();
 
-    console.log("\nVerifying credentials...");
-    const client = new OpenProjectClient({ url, username, password });
+    console.log("\nLogging in...");
 
     try {
+      const session = await OpenProjectClient.login(url, username, password);
+      const client = new OpenProjectClient({ url, username, password, session });
       const user = await client.getMe();
       console.log(`Authenticated as ${user.firstName} ${user.lastName} (${user.login})`);
-      saveConfig({ url, username, password });
+      saveConfig({ url, username, password, session });
       console.log("Configuration saved.");
     } catch (err: any) {
       console.error(`Error: ${err.message}`);

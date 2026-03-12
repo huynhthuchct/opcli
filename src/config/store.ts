@@ -6,12 +6,14 @@ export interface OpcliConfig {
   url: string;
   username: string;
   password: string;
+  session?: string;
 }
 
 interface StoredConfig {
   url: string;
   username: string;
   password: string;
+  session?: string;
 }
 
 export function getConfigPath(): string {
@@ -28,6 +30,7 @@ export function loadConfig(): OpcliConfig | null {
     url: raw.url,
     username: raw.username,
     password: Buffer.from(raw.password, "base64").toString("utf-8"),
+    session: raw.session,
   };
 }
 
@@ -41,6 +44,7 @@ export function saveConfig(config: OpcliConfig): void {
     url: config.url,
     username: config.username,
     password: Buffer.from(config.password).toString("base64"),
+    session: config.session,
   };
   fs.writeFileSync(configPath, JSON.stringify(stored, null, 2));
 }

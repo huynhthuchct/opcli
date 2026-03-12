@@ -13,10 +13,11 @@ describe("OpenProjectClient", () => {
       url: "https://devtak.cbidigital.com",
       username: "admin",
       password: "secret",
+      session: "test-session-id",
     });
   });
 
-  it("sends correct auth header", async () => {
+  it("sends correct cookie header", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ id: 1, login: "admin" }),
@@ -24,9 +25,8 @@ describe("OpenProjectClient", () => {
     await client.getMe();
     const call = mockFetch.mock.calls[0];
     expect(call[0]).toBe("https://devtak.cbidigital.com/api/v3/users/me");
-    const authHeader = call[1].headers["Authorization"];
-    const expected = "Basic " + Buffer.from("admin:secret").toString("base64");
-    expect(authHeader).toBe(expected);
+    const cookieHeader = call[1].headers["Cookie"];
+    expect(cookieHeader).toBe("_open_project_session=test-session-id");
   });
 
   it("getMe returns user info", async () => {
@@ -47,7 +47,7 @@ describe("OpenProjectClient", () => {
     await expect(client.getMe()).rejects.toThrow("Authentication failed");
   });
 
-  it("listMyWorkPackages calls correct endpoint with filters", async () => {
+  it("listWorkPackages calls correct endpoint with filters", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -59,7 +59,7 @@ describe("OpenProjectClient", () => {
           },
         }),
     });
-    const tasks = await client.listMyWorkPackages();
+    const tasks = await client.listWorkPackages();
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain("/api/v3/work_packages");
     expect(url).toContain("filters");
@@ -94,12 +94,12 @@ describe("OpenProjectClient", () => {
     expect(statuses[0].name).toBe("New");
   });
 
-  it("updateWorkPackageStatus sends PATCH with lockVersion", async () => {
+  it("updateWorkPackage sends PATCH with lockVersion", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ id: 10, lockVersion: 6 }),
     });
-    await client.updateWorkPackageStatus(10, 5, "/api/v3/statuses/2");
+    await client.updateWorkPackage(10, 5, { status: "/api/v3/statuses/2" });
     const call = mockFetch.mock.calls[0];
     expect(call[1].method).toBe("PATCH");
     const body = JSON.parse(call[1].body);
