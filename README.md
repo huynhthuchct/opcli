@@ -77,6 +77,9 @@ opcli tasks comment <id> "Nội dung comment"
 ```bash
 opcli tasks view <id>
 
+# Mở trên browser
+opcli tasks view <id> --web
+
 # Kèm activities
 opcli tasks view <id> --activities
 
@@ -165,7 +168,9 @@ opcli hook uninstall
 
 Sau khi cài, opcli sẽ thiết lập:
 
-**Post-commit hook** — mỗi lần `git commit` sẽ hỏi nhập hours để log time (enter để skip).
+**Post-commit hook** — mỗi lần `git commit`:
+- Nếu commit message chứa `done:` (không phân biệt hoa thường) → tự động cập nhật task sang "Developed"
+- Hỏi nhập hours để log time (enter để skip)
 
 **Post-checkout hook** — khi `git checkout -b feature/op-<id>-*` tạo branch mới, sẽ hỏi có muốn cập nhật task sang "In Process" không.
 

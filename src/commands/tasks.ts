@@ -218,8 +218,19 @@ tasksCommand
   .description("View details of a work package")
   .option("--activities", "Show activities/history")
   .option("--relations", "Show relations")
-  .action(async (id: string, options: { activities?: boolean; relations?: boolean }) => {
+  .option("--web", "Open task in browser")
+  .action(async (id: string, options: { activities?: boolean; relations?: boolean; web?: boolean }) => {
     const config = requireConfig();
+
+    if (options.web) {
+      const baseUrl = config.url.replace(/\/$/, "");
+      const url = `${baseUrl}/work_packages/${id}`;
+      const { exec } = await import("node:child_process");
+      exec(`open "${url}"`);
+      console.log(chalk.green(`Opening ${url}`));
+      return;
+    }
+
     const client = new OpenProjectClient(config);
 
     try {
