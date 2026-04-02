@@ -9,12 +9,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org/
+
       - run: npm ci
-      # Bước npm test đã bị loại bỏ ở đây
+
+      # BƯỚC MỚI: Tự động đồng bộ version từ GitHub Tag vào package.json
+      # Lấy github.ref_name (ví dụ v1.0.5) và bỏ chữ 'v' đi nếu có
+      - name: Sync version from Tag
+        run: |
+          NEW_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+          npm version $NEW_VERSION --no-git-tag-version --allow-same-version
+
       - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.npm_token}}
