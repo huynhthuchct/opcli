@@ -146,6 +146,47 @@ describe("OpenProjectClient", () => {
     expect(body._links.status.href).toBe("/api/v3/statuses/2");
   });
 
+  it("updateWorkPackage sends subject when provided", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
+    await client.updateWorkPackage(56140, 1, {
+      subject: "[ITG-18-003] Updated title",
+    });
+
+    const call = mockFetch.mock.calls[0];
+    expect(call[0]).toBe("https://devtak.cbidigital.com/api/v3/work_packages/56140");
+    expect(call[1].method).toBe("PATCH");
+    expect(JSON.parse(call[1].body)).toEqual({
+      lockVersion: 1,
+      subject: "[ITG-18-003] Updated title",
+    });
+  });
+
+  it("updateWorkPackage sends subject together with description and dates", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
+    await client.updateWorkPackage(56140, 3, {
+      subject: "[ITG-18-003] New title",
+      startDate: "2026-03-31",
+      dueDate: "2026-04-01",
+      description: "Updated description",
+    });
+
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({
+      lockVersion: 3,
+      subject: "[ITG-18-003] New title",
+      startDate: "2026-03-31",
+      dueDate: "2026-04-01",
+      description: { raw: "Updated description" },
+    });
+  });
+
   it("createRelation posts relation body to work package relations endpoint", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
