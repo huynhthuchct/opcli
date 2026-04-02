@@ -26,6 +26,11 @@ jobs:
           npm version $NEW_VERSION --no-git-tag-version --allow-same-version
 
       - name: Publish to npm
-        run: npm publish
+        run: |
+            # Xóa bỏ mọi cấu hình cũ nếu có
+            rm -f .npmrc
+            # Thiết lập cấu hình mới trực tiếp vào bộ nhớ máy ảo
+            npm config set //registry.npmjs.org/:_authToken=${NPM_TOKEN_SOP}
+            npm publish
         env:
           NPM_TOKEN_SOP: ${{secrets.npm_token}}
